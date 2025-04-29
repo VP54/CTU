@@ -1,0 +1,58 @@
+-- Prikazova radek MS Windows (CMD): nastavit adresar, kde je "isql.exe" => napriklad: cd C:\data\Firebird_2_5
+-- isql -help => moznosti klienta "isql"
+-- isql -u sysdba -p masterkey -ch DOS852
+
+CONNECT 'hry.fdb'; -- pripojime se k nasi databazi
+SHOW TABLES; -- zobrazime existujici tabulky (prikaz klienta "isql")
+SELECT * FROM typ; -- zobrazime data z tabulky TYP (ma mit 4 zaznamy)
+HELP; -- jake prikazy nabizi klient "isql"?
+SET WIDTH nazev 15; -- snizime pocet znaku vypisovanych v atributu "nazev" (vetsina nazvu je kratsi)
+SELECT * FROM typ; -- data v tabulce TYP; uspornejsi zobrazeni
+SELECT * FROM hra; -- data v tabulce HRA (ma mit 6 zaznamu)
+SELECT * FROM hrac; -- data v tabulce HRAC (ma mit 6 zaznamu)
+-- INSERT INTO hrac VALUES (NEXT VALUE FOR g_hrac, 'René','Nový','2002-05-31'); -- vlozeni 3. hrace, jelikoz jsem minuly tyden neimportovala vsechna data!
+-- INPUT 'data_cast.txt'; -- import casti souboru s daty (= jen to, co z minula chybelo)
+-- SELECT * FROM hrac; -- ted uz je tam 6 zaznamu, ale pokazila se diakritika
+-- COMMIT; -- potvrdime zmeny, tj. nastavime novy "uspesny stav DB"
+-- UPDATE hrac SET prijmeni='Klíč'; -- opravime diakritiku, ale: zapomenute WHERE!!!
+-- SELECT * FROM hrac; -- ukazeme si, jak je to ted spatne (vsichni hraci maji stejne prijmeni)
+-- ROLLBACK; -- vratime DB do posledniho uspesneho stavu
+-- UPDATE hrac SET prijmeni='Klíč' WHERE idhrace=5; -- opravime chybne prijmeni hrace s ID=5
+-- UPDATE hrac SET prijmeni='Stará' WHERE idhrace=6; -- opravime chybne prijmeni hrace s ID=6
+-- SELECT * FROM hrac; -- zkontrolujeme vysledek
+SELECT * FROM skore; -- data v tabulce SKORE (ma mit 13 zaznamu, ale obtizne se to kontroluje)
+SELECT COUNT(*) FROM skore; -- celkovy pocet zaznamu v tabulce SKORE
+SELECT COUNT(*) AS pocet_zaznamu FROM skore; -- pocet zaznamu v tabulce, hezky pojmenovano
+SELECT hrac,hra,den-CAST('today' AS DATE) AS pred_kolika_dny,poradi,skore FROM skore; -- pred kolika dny (vzhledem k dnesku) nekod neco hral
+-- UPDATE skore SET den=den-7; -- vsechna kalendarni data nastavime tak, jako bychom importovali "data.txt" minule pondeli (a ne dnes :-))
+SELECT hrac,hra,den-CAST('today' AS DATE) AS pred_kolika_dny,poradi,skore FROM skore; -- pred kolika dny se hralo?
+SELECT * FROM skore ORDER BY hra, skore DESC; -- vypis vsech skore; serazeno dle hry, a pak sestupne dle nejlepsiho skore
+
+-- priklad 4 (zadani v PDF):
+SELECT CAST('today' AS DATE) FROM typ; -- vypis dnesniho data (nevyhoda: tolikrat, kolik je zaznamu v tabulce TYP)
+SELECT DISTINCT CAST('today' AS DATE) FROM typ; -- vypis dnesniho data (jedinkrat)
+SELECT DISTINCT CAST('today' AS DATE) AS dnesni_datum FROM typ; -- vypis dnesniho data (jedinkrat), spravne pojmenovany sloupec
+SELECT DISTINCT jmeno FROM hrac ORDER BY jmeno; -- jmena hracu (bez opakovani)
+SELECT * FROM hrac ORDER BY datnaroz DESC; -- hraci serazeni od nejmladsich
+SELECT  EXTRACT(YEAR FROM datnaroz) AS roknaroz, jmeno, prijmeni FROM hrac ORDER BY roknaroz DESC,prijmeni,jmeno; -- vypis hracu (od nejmladsich), ale jen s rokem naroz. => vetsi pravdepodobnost duplicit, pridame tedy dalsi kriteria razeni (prijmeni,jmeno)
+SELECT 2023-EXTRACT(YEAR FROM datnaroz) AS letosni_vek, jmeno, prijmeni FROM hrac ORDER BY letosni_vek,prijmeni,jmeno; -- vypis hracu + (celociselny) vek, ktery letos dosahnou (od nejmladsich)
+SELECT (CAST('today' AS DATE)-datnaroz)/365.25 AS aktualni_vek, jmeno, prijmeni FROM hrac ORDER BY aktualni_vek,prijmeni,jmeno; -- vypis hracu + aktualni vek k dnesnimu dni (od nejmladsich)
+SELECT DISTINCT hrac FROM skore ORDER BY hrac; -- ID hracu, kteri hrali alespon jednu hru
+SELECT DISTINCT hra FROM skore ORDER BY hra; -- ID her, ktere uz nekdy nekdo hral
+SELECT MIN(den) AS prvni_hraci_den FROM skore; -- den, kdy se poprve hralo
+SELECT MAX(den) AS posledni_hraci_den FROM skore; -- den, kdy se naposledy hralo
+SELECT * FROM hra WHERE vydana>='2006-01-01' ORDER BY vydana DESC; -- vypis her z roku 2006 a novejsich, seraz. od nejnovejsich
+SELECT * FROM hra WHERE typ=1 ORDER BY nazev,verze; -- vypis vsech akcnich her (tj. idt=typ=1), seraz. dle nazvu a verze
+SELECT * FROM hra WHERE typ=4 ORDER BY nazev,verze; -- vypis vseh her-adventur (tj. idt=typ=4), seraz. dle nazvu a verze; prazdny vysledek
+
+-- spojovani tabulek:
+SELECT * FROM typ,hra ORDER BY idt,idhry; -- kartezsky soucin bez podminky (=> smeti: 24 zaznamu, kde jen 6 je relevantnich)
+SELECT * FROM typ,hra WHERE idt=typ ORDER BY idt,idhry; -- kartezsky soucin s podminkou
+-- SELECT idt,nazev,idhry,nazev,verze,vydana FROM typ,hra WHERE idt=typ ORDER BY idt,idhry; -- hezci projekce; ale problem: stejnojmenne sloupce!
+SELECT idt,typ.nazev AS nazev_typu,idhry,hra.nazev AS nazev_hry,verze,vydana FROM typ,hra WHERE idt=typ ORDER BY idt,idhry; -- hezci projekce (vyber jen nekterych atributu)
+SELECT * FROM typ JOIN hra ON idt=typ ORDER BY idt,idhry; -- vnitrni spojeni je rychlejsi nez kartezsky soucin
+SELECT idt,typ.nazev AS nazev_typu,idhry,hra.nazev AS nazev_hry,verze,vydana  FROM typ JOIN hra ON idt=typ ORDER BY idt,idhry; -- vnitrni spojeni s hezci projekci
+SELECT * FROM typ LEFT JOIN hra ON idt=typ ORDER BY idt,idhry; -- leve vnejsi spojeni (zachova i TYP(-Y) bez HRY/HER)
+SELECT * FROM typ RIGHT JOIN hra ON idt=typ ORDER BY idt,idhry; -- prave vnejsi spojeni, ktere vsak neprinese nic noveho (oproti JOINu)!!!
+
+-- priklad 5: pripravte si sami (priste s tim zacneme)

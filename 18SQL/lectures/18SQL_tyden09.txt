@@ -1,0 +1,67 @@
+-- cd C:\...nekde...\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+CONNECT 'hry.fdb'; -- pripojeni k existujici databazi
+-- nastaveni mensi sirky nekterych sloupcu (pri zobrazeni; prikaz "isql") :
+SET WIDTH jmeno 8;
+SET WIDTH prijmeni 15;
+SET WIDTH nazev 15;
+SET WIDTH nazevhry 15;
+SET WIDTH nazevtypu 15;
+SHOW SEQUENCES; -- jake sekvence mame v databazi (a jakou maji hodnotu)
+
+-- priklad 9:
+
+-- priklad 9-2:
+SET TERM !! ; -- novy ukoncovaci znak (prikaz "isql"!)
+CREATE TRIGGER t_bi_hrac ACTIVE BEFORE INSERT ON hrac AS BEGIN IF (NEW.idhrace IS NULL) THEN NEW.idhrace = NEXT VALUE FOR g_hrac; END !!
+SET TERM ;!! -- strednik je opet ukoncovacim znakem
+-- pouziti spoustece:
+INSERT INTO hrac VALUES (NULL, 'Jan', 'Nos', '1999-12-01');
+INSERT INTO hrac (jmeno,prijmeni,datnaroz) VALUES ('Ivana', 'Malá', '1999-11-10');
+SELECT * FROM hrac ORDER BY prijmeni; -- povedlo se vlozit zaznamy?
+
+-- priklad 9-1:
+SET TERM !! ;
+CREATE TRIGGER t_bi_hra ACTIVE BEFORE INSERT ON hra AS BEGIN IF (NEW.idhry IS NULL) THEN NEW.idhry = NEXT VALUE FOR g_hra; END !!
+SET TERM ; !!
+
+-- priklad 9-3:
+SET TERM !! ;
+CREATE TRIGGER t_bi_typ ACTIVE BEFORE INSERT ON typ AS BEGIN IF (NEW.idt IS NULL) THEN NEW.idt = NEXT VALUE FOR g_typ; END !!
+SET TERM ; !!
+SHOW TRIGGERS; -- jake spoustece mame? (jde o prikaz "isql"!)
+
+-- priklad 9-4:
+SET TERM !!;
+CREATE TRIGGER t_bi_skore ACTIVE BEFORE INSERT ON skore AS DECLARE poradi INTEGER; BEGIN IF (NEW.den IS NULL) THEN NEW.den = CAST('today' AS DATE); IF (NEW.poradi IS NULL) THEN BEGIN SELECT MAX(poradi) FROM skore WHERE hrac=NEW.hrac AND hra=NEW.hra AND den=NEW.den INTO :poradi; IF (poradi IS NULL) THEN NEW.poradi=1; ELSE NEW.poradi=poradi+1; END END !!
+SHOW TRIGGERS !! -- jake triggery mame? (pozor: ukoncovaci znak ted neni strednik)
+SET TERM ; !!
+-- prohledneme si existujici spoustec:
+SHOW TRIGGER t_bi_skore; -- prikaz klienta "isql"
+SHOW TRIGGER t_bi_hra;
+-- pouziti spoustece pro vkladani do tabulky SKORE:
+INSERT INTO skore (hrac,hra,den,skore) VALUES (6,3,'2023-11-06',3953);
+SELECT * FROM skore WHERE hrac=6 AND hra=3 AND den='2023-11-06' ORDER BY poradi; -- podivame se, ze to dopadlo dobre
+INSERT INTO skore (hrac,hra,den,skore) VALUES (6,3,'2023-11-20',4003);
+SELECT * FROM skore WHERE hrac=6 AND hra=3 AND den='2023-11-20' ORDER BY poradi;
+INSERT INTO skore (hrac,hra,skore) VALUES (6,3,4092);
+SELECT * FROM skore WHERE hrac=6 AND hra=3 AND den='2023-11-20' ORDER BY poradi;
+INSERT INTO skore (hrac,hra,skore) VALUES (1,2,7103);
+SELECT * FROM skore WHERE hra=2 ORDER BY hrac,den,poradi;
+INSERT INTO skore VALUES (1,2,NULL,NULL,7090);
+SELECT * FROM skore WHERE hra=2 ORDER BY hrac,den,poradi;
+-- INSERT INTO skore (hrac,hra) VALUES (1,2); -- chyba (hodnotu skore nelze vynechat!)
+
+-- priklad 9-5:
+CREATE EXCEPTION chyba 'Nastala chyba.';
+
+-- priklad 9-6:
+SET TERM !!;
+CREATE PROCEDURE p_typ_novy (nazevt TYPE OF COLUMN typ.nazev) RETURNS (id INTEGER) AS BEGIN SELECT idt FROM typ WHERE nazev = :nazevt INTO :id; IF (id IS NULL) THEN BEGIN id = NEXT VALUE FOR g_typ; INSERT INTO typ VALUES (:id,:nazevt); WHEN ANY DO EXCEPTION chyba 'Nelze vlozit novy typ!'; END END !!
+SET TERM ; !!
+-- pouziti spoustece:
+EXECUTE PROCEDURE p_typ_novy ('logická'); -- jiz existujici typ
+EXECUTE PROCEDURE p_typ_novy ('RPG'); -- novy typ
+SELECT * FROM typ ORDER BY nazev;
+
+-- ukol na priste: priklad 9-7 (a dalsi)

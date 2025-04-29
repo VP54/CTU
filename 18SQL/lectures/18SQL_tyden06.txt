@@ -1,0 +1,45 @@
+-- cd C:\spravny_adresar\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+-- nastaveni "isql", aby nezobrazoval siroke nazvy nekterych atributu typu VARCHAR:
+-- SET WIDTH jmeno 8; -- prikaz "isql"!
+-- SET WIDTH prijmeni 15;
+-- SET WIDTH nazev 15;
+
+CONNECT 'hry.fdb';
+
+-- priklad 6-5 (opakovani):
+SELECT idhrace,MIN(jmeno) AS jmeno,MIN(prijmeni) AS prijmeni,idhry,MIN(nazev) AS nazev,COUNT(DISTINCT den) AS pocet_dni FROM hra JOIN skore ON idhry=hra JOIN hrac ON hrac=idhrace GROUP BY idhrace,idhry ORDER BY 3,5;
+
+-- priklad 6-6:
+SELECT idhrace,MIN(jmeno) AS jmeno,MIN(prijmeni) AS prijmeni,idhry,MIN(nazev) AS nazev,COUNT(DISTINCT den) AS pocet_ruznych_dni, MAX(den) AS posledni_den FROM hra JOIN skore ON idhry=hra JOIN hrac ON hrac=idhrace GROUP BY idhrace,idhry ORDER BY 3,5;
+
+-- priklad 6-7:
+SELECT idhry,MIN(nazev) AS nazev,COUNT(hra) AS pocet_hrani FROM skore JOIN hra ON hra=idhry GROUP BY idhry HAVING COUNT (hra)>=5 ORDER BY nazev;
+SELECT idhry,MIN(nazev) AS nazev,COUNT(hra) AS pocet_hrani FROM skore JOIN hra ON hra=idhry GROUP BY idhry HAVING COUNT (hra)>=2 ORDER BY nazev; -- jak zmena podminky v HAVING ovlivni vysledek na nasich datech
+
+-- priklad 6-8 (dva zpusoby: lisi se v projekci, resp. v agregaci):
+SELECT idhry,nazev,COUNT(DISTINCT hrac) AS pocet_ruznych_hracu FROM hra JOIN skore ON idhry=hra GROUP BY idhry,nazev HAVING COUNT(DISTINCT hrac)>=2 ORDER BY nazev;
+SELECT idhry,MIN(nazev) AS nazevhry,COUNT(DISTINCT hrac) AS pocet_ruznych_hracu FROM hra JOIN skore ON idhry=hra GROUP BY idhry HAVING COUNT(DISTINCT hrac)>=2 ORDER BY nazevhry;
+
+-- priklad 6-9 (nekolik zpusobu, ktere se lisi v projekci, resp. v agregaci):
+SELECT hra,MIN(nazev) AS nazev,hrac FROM skore JOIN hra ON hra=idhry GROUP BY hrac,hra HAVING COUNT(skore)>=2 ORDER BY nazev,hrac;
+SELECT MIN(idhry) AS idhry,MIN(nazev) AS nazev,hrac FROM skore JOIN hra ON hra=idhry GROUP BY hrac,hra HAVING COUNT(skore)>=2 ORDER BY nazev,hrac;
+SELECT idhry,MIN(nazev) AS nazev,hrac FROM skore JOIN hra ON hra=idhry GROUP BY hrac,idhry HAVING COUNT(skore)>=2 ORDER BY nazev,hrac;
+
+-- priklad 6-10:
+SELECT den, COUNT(DISTINCT hra) AS pocet_ruznych_her FROM skore GROUP BY den ORDER BY den DESC;
+
+-- priklad 6-11:
+SELECT idhrace,MIN(jmeno) AS jmeno, MIN(prijmeni) AS prijmeni,MIN(datnaroz) AS dataroz,idhry,MIN(nazev) AS nazev,AVG(skore*1.00) AS prumerne_skore FROM hrac LEFT JOIN (skore JOIN hra ON hra=idhry) ON idhrace=hrac GROUP BY idhrace,idhry ORDER BY prijmeni,jmeno;
+
+
+-- teorie k poddotazum - pomocne dotazy:
+SELECT COUNT(typ) FROM hra WHERE typ=1;
+SELECT COUNT(*) FROM hra WHERE typ=1;
+-- ukazky poddotazu:
+SELECT idhrace, jmeno, prijmeni, (SELECT COUNT(DISTINCT(hra)) FROM skore WHERE hrac=idhrace) AS pocet_ruznych_her FROM hrac ORDER BY prijmeni, jmeno, datnaroz; -- prehled hracu + pocet ruznych her, ktere kazdy hrac hral (toto je korelovany poddotaz!)
+SELECT idhrace, MIN(jmeno) AS jmeno, MIN(prijmeni) AS prijmeni, COUNT(DISTINCT(hra)) AS pocet_ruznych_her FROM hrac LEFT JOIN skore ON hrac=idhrace GROUP BY idhrace ORDER BY prijmeni, jmeno, MIN(datnaroz); -- totez bez poddotazu (avsak nutny LEFT JOIN!)
+SELECT * FROM hra WHERE idhry NOT IN (SELECT hra FROM skore) ORDER BY nazev; -- vypis her, ktere zatim nikdo nehral (pomoci poddotazu)
+SELECT hra.* FROM hra LEFT JOIN skore ON idhry=hra WHERE hra IS NULL ORDER BY nazev; -- totez bez poddotazu (avsak nutny LEFT JOIN)
+SELECT idhry,nazev,vydana FROM hra WHERE vydana = (SELECT MIN(vydana) FROM hra) ORDER BY nazev; -- vypis nekterych informaci o nEJSTARSI hre (pripadne hrach, je-li vicero stejne starych) 
+SELECT * FROM typ WHERE 2 <= (SELECT COUNT(typ) FROM hra WHERE idt=typ) ORDER BY nazev; -- vypis typu, pod ktere patri alespon 2 hry

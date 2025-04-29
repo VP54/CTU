@@ -1,0 +1,1 @@
+        cteni_soubor >> tmp;

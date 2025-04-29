@@ -1,0 +1,48 @@
+-- cd C:\...nekde...\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+CONNECT 'hry.fdb'; -- pripojeni k existujici databazi
+-- nastaveni mensi sirky nekterych sloupcu (pri zobrazeni; prikaz "isql") :
+SET WIDTH jmeno 8;
+SET WIDTH prijmeni 15;
+SET WIDTH nazev 15;
+
+-- priklad 8-4:
+SELECT idhry,MIN(nazev),MIN(verze),MAX(skore) FROM hra JOIN skore ON idhry=hra GROUP BY idhry ORDER BY 2,3; -- priprava (podivame se, jestli vysledek vyhovuje)
+CREATE VIEW hry_max_skore (idhry,nazev,verze,skore_max) AS SELECT idhry,MIN(nazev),MIN(verze),MAX(skore) FROM hra JOIN skore ON idhry=hra GROUP BY idhry; -- udelame pohled (bez ORDDER BY!)
+SELECT * FROM hry_max_skore ORDER BY 2,3; -- pouzijeme pohled
+SELECT * FROM hry_max_skore ORDER BY skore_max; -- pouzijeme pohled s jinym razenim
+
+-- priklad 8-5:
+SHOW VIEWS; -- podivame se, jake pohledy by se daly vyuzit (jde o prikaz "isql"!)
+SHOW VIEW skore_vse; -- podivame se na jmena atributu ve SKORE_VSE (toto je opet prikaz "isql"!), mimo jine uvidime i "definici pohledu"
+CREATE VIEW vitezove (idhry,nazev,verze,idhrace,jmeno,prijmeni,den,poradi,skore) AS SELECT H.idhry,nazev,H.verze,idhrace,jmeno,prijmeni,den,poradi,skore FROM hry_max_skore H JOIN skore_vse S ON H.idhry=S.idhry WHERE skore=skore_max; -- pohled z prikladu 8-5
+SELECT * FROM vitezove ORDER BY den; -- pouziti pohledu
+-- pridame data:
+INSERT INTO skore VALUES (6,3,'2023-11-13',1,4181); -- novy vitez hry 3
+INSERT INTO skore VALUES (1,6,'2023-11-13',1,9800); -- novy vitez hry 6 (prvni hrani teto hry)
+SELECT * FROM vitezove ORDER BY den; -- jak vypada pohled VITEZOVE nyni? (Ubyde vitez hry 3, pribyde vitez hry 6)
+
+-- priklad 8-6:
+CREATE VIEW hry_statistiky (idhry,nazev,verze,skore_max,skore_min,skore_avg,den_prvni,den_posledni,pocet_ruznych_dnu,pocet_ruznych_hracu,pocet_hrani) AS SELECT idhry,MIN(nazev),MIN(verze),MAX(skore),MIN(skore),AVG(skore),MIN(den),MAX(den),COUNT(DISTINCT den),COUNT(DISTINCT hrac),COUNT(den) FROM hra JOIN skore ON idhry=hra GROUP BY idhry; -- pohled je "sirsi" nez HRY_MAX_SKORE
+SELECT * FROM hry_statistiky ORDER BY nazev; -- pouziti pohledu
+COMMIT; -- zakoncime transakci (aby pohled nebyl "in use") a vylepsime si prumerne skore:
+RECREATE VIEW hry_statistiky (idhry,nazev,verze,skore_max,skore_min,skore_avg,den_prvni,den_posledni,pocet_ruznych_dnu,pocet_ruznych_hracu,pocet_hrani) AS SELECT idhry,MIN(nazev),MIN(verze),MAX(skore),MIN(skore),AVG(skore*1.00),MIN(den),MAX(den),COUNT(DISTINCT den),COUNT(DISTINCT hrac),COUNT(den) FROM hra JOIN skore ON idhry=hra GROUP BY idhry;
+SELECT * FROM hry_statistiky ORDER BY nazev; -- pouziti pohledu (prum. skore ma 2 des. mista)
+-- pridame data:
+INSERT INTO skore VALUES (1,6,'2023-11-13',2,9800);
+SELECT * FROM hry_statistiky ORDER BY nazev; -- zmenil se jen pocet_hrani u hry 6 (zamerne jsme zadali stejne skore)
+-- mimochodem: v pohledu VITEZOVE ma ted hra 6 "dvojiteho" viteze (s poradim 1 a 2)
+
+-- priklad 8-7:
+CREATE VIEW hraci_statistiky (idhrace,jmeno,prijmeni,skore_max,skore_min,skore_avg,den_prvni,den_posledni,pocet_ruznych_dnu,pocet_ruznych_her,pocet_hrani) AS SELECT idhrace,MIN(jmeno),MIN(prijmeni),MAX(skore),MIN(skore),AVG(skore*1.00),MIN(den),MAX(den),COUNT(DISTINCT den),COUNT(DISTINCT hra),COUNT(den) FROM hrac JOIN skore ON idhrace=hrac GROUP BY idhrace; -- tento pohled neodpovida zadani (divame se pres jednoho hrace na vsechny hry soucasne!)
+SELECT * FROM hraci_statistiky ORDER BY prijmeni; -- pouziti
+CREATE VIEW hraci_statistiky0 (idhrace,jmeno,prijmeni,skore_max,skore_min,skore_avg,den_prvni,den_posledni,pocet_ruznych_dnu,pocet_ruznych_her,pocet_hrani) AS SELECT idhrace,MIN(jmeno),MIN(prijmeni),MAX(skore),MIN(skore),AVG(skore*1.00),MIN(den),MAX(den),COUNT(DISTINCT den),COUNT(DISTINCT hra),COUNT(den) FROM hrac JOIN skore ON idhrace=hrac GROUP BY idhrace;
+COMMIT; -- odstranime pohled HRACI_STATISTIKY, abychom ho vytvorili v souladu se zadanim prkladu 8-7. Misto RECREATE pouzijeme DROP+CREATE
+DROP VIEW hraci_statistiky; -- pohled byl jenom pres hrace, nezohlednoval jednotlive hry!
+CREATE VIEW hraci_statistiky (idhrace,jmeno,prijmeni,idhry,nazev,verze,skore_max,skore_min,skore_avg,den_prvni,den_posledni,pocet_ruznych_dnu,pocet_ruznych_her,pocet_hrani) AS SELECT idhrace,MIN(jmeno),MIN(prijmeni),idhry,MIN(nazev),MIN(verze),MAX(skore),MIN(skore),AVG(skore*1.00),MIN(den),MAX(den),COUNT(DISTINCT den),COUNT(DISTINCT hra),COUNT(den) FROM (hrac JOIN skore ON idhrace=hrac) JOIN hra ON hra=idhry GROUP BY idhrace,idhry;
+SELECT * FROM hraci_statistiky ORDER BY prijmeni,nazev;                                      
+SELECT * FROM hraci_statistiky WHERE idhrace=1 ORDER BY prijmeni,nazev;  -- statistiky hrace s id=1
+
+
+SHOW VIEWS; -- aktuani stav (pohledy). Jde o prikaz klienta "isql"!
+SET; -- jak je nastavene prostredi "isql"? (Zajima nas "Autocommit DDL")

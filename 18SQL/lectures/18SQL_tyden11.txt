@@ -1,0 +1,66 @@
+-- cd C:\...nekde...\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+CONNECT 'snatky.fdb'; -- pripojeni k databazi, kterou jsme vytvorili minule (musi byt na lokalnim disku!)
+
+SHOW DOMAINS; -- jake mame domeny?
+SHOW TABLES; -- jake tabulky mame vytvorene z minuleho tydne?
+
+-- vytvorime zbyle 2 tabulky (jelikoz chybi "ON DELETE...", tak jsou cizi klice nastaveny na zakaz mazani v nadrazenych tabulkach, pokud existuje podrizeny zaznam. Napr. pokud ma osoba potomka, nepujde ji smazat):
+
+CREATE TABLE potomek (osoba_id identif, matka_id cislo_nepov, otec_id cislo_nepov, CONSTRAINT potomek_pk PRIMARY KEY (osoba_id), CONSTRAINT potomek_osoba_fk FOREIGN KEY (osoba_id) REFERENCES osoba (ido) ON UPDATE CASCADE, CONSTRAINT potomek_matka_fk FOREIGN KEY (matka_id) REFERENCES osoba (ido) ON UPDATE CASCADE, CONSTRAINT potomek_otec_fk FOREIGN KEY (otec_id) REFERENCES osoba (ido) ON UPDATE CASCADE);
+
+CREATE TABLE snatek (datum datum_pov, nevesta_id identif, zenich_id identif, misto_id cislo_nepov, nprijmn str35nepov, nprijmz str35nepov, dat_rozvodu datum_nepov, CONSTRAINT snatek_pk PRIMARY KEY (datum, zenich_id), CONSTRAINT snatek_uniq UNIQUE (datum, nevesta_id), CONSTRAINT snatek_nevesta_fk FOREIGN KEY (nevesta_id) REFERENCES osoba (ido) ON UPDATE CASCADE, CONSTRAINT snatek_zenich_fk FOREIGN KEY (zenich_id) REFERENCES osoba (ido) ON UPDATE CASCADE, CONSTRAINT snatek_misto_fk FOREIGN KEY (misto_id) REFERENCES misto (id) ON UPDATE CASCADE);
+
+SHOW TABLES;
+
+-- sekvence pro tabulky/ciselniky:
+CREATE SEQUENCE g_osoba;
+CREATE SEQUENCE g_misto;
+
+-- vyjimka (pro pouziti v procedurach):
+CREATE EXCEPTION chyba 'Nastala nejaka chyba.';
+
+-- procedury neselektove (spustitelne):
+SET TERM !! ;
+
+CREATE PROCEDURE p_osoba_pridej (jmeno TYPE OF COLUMN osoba.jmeno, prijmeni TYPE OF COLUMN osoba.rodne_prijm, rodnecislo TYPE OF COLUMN osoba.rodne_cislo, datnar TYPE OF COLUMN osoba.dat_naroz, pohlavi TYPE OF COLUMN osoba.pohlavi = 'M') RETURNS (ido INTEGER) AS BEGIN ido = NEXT VALUE FOR g_osoba; INSERT INTO osoba (ido,jmeno,rodne_prijm,pohlavi,rodne_cislo,dat_naroz) VALUES (:ido,:jmeno,:prijmeni,:pohlavi,:rodnecislo,:datnar); WHEN ANY DO EXCEPTION chyba 'Nepodarilo se vlozit novou osobu!'; END !!
+
+CREATE PROCEDURE p_misto_pridej (ulice TYPE OF COLUMN misto.ulice, cp TYPE OF COLUMN misto.cp, mesto TYPE OF COLUMN misto.mesto, psc TYPE OF COLUMN misto.psc) RETURNS (id INTEGER) AS BEGIN id = NEXT VALUE FOR g_misto; INSERT INTO misto VALUES (:id,:ulice,:cp,:mesto,:psc); WHEN ANY DO EXCEPTION chyba 'Nepodarilo se vlozit nove misto!'; END !!
+
+SHOW PROCEDURES!! -- jake mame procedury? (stredniku jsme zatim nevratili jeho vyznam)
+SET TERM ; !!
+-- pridame osoby (rodna cisla jsou vymyslena...):
+EXECUTE PROCEDURE p_osoba_pridej ('Jan','Malý','8503060000','1986-03-06');
+EXECUTE PROCEDURE p_osoba_pridej ('Eva','Tupá','8757090000','1987-07-09','F');
+-- EXECUTE PROCEDURE p_osoba_pridej ('René','Čáp','370916000','19837-09-16'); -- chybne datum narozeni!
+-- ALTER SEQUENCE g_osoba RESTART WITH 2; -- vratime hodnotu sekvence na cislo, ktere potrebujeme
+EXECUTE PROCEDURE p_osoba_pridej ('René','Čáp','370916000','1937-09-16');
+EXECUTE PROCEDURE p_osoba_pridej ('Ivo','Nový','5604230000','1956-04-23');
+EXECUTE PROCEDURE p_osoba_pridej('Jan','Šerý','8809160000','1988-09-16');
+EXECUTE PROCEDURE p_osoba_pridej('Iva','Nová','8953190000','1989-03-19','F');
+EXECUTE PROCEDURE p_osoba_pridej('Ema','Malá','425625000','1942-06-25','F');
+EXECUTE PROCEDURE p_osoba_pridej('Eva','Janů','5851310000','1958-01-31','F');
+EXECUTE PROCEDURE p_osoba_pridej('Jiří','Suk','6511090000','1965-11-09');
+
+SELECT * FROM osoba ORDER BY ido; -- vysledek: 9 osob
+
+-- dalsi neselektova procedura:
+
+SET TERM !!;
+CREATE PROCEDURE p_osoba_umrti (ido TYPE OF COLUMN osoba.ido, datum datum_nepov = NULL) RETURNS (info VARCHAR(70)) AS DECLARE VARIABLE id_stare INTEGER; DECLARE VARIABLE datum_stare DATE; BEGIN info = 'Datum umrti bylo nastaveno uspesne.'; /* jsme optimiste */ IF (datum IS NULL) THEN datum = CAST('today' AS DATE); SELECT ido, dat_umrti FROM osoba WHERE ido=:ido INTO :id_stare,:datum_stare; IF (id_stare IS NULL) THEN BEGIN info = 'Osoba neexistuje!'; EXIT; END IF (datum_stare IS NOT NULL) THEN /* co kdyz uz osoba mela vyplnene datum umrti? */ BEGIN IF (datum_stare = :datum) THEN BEGIN info = 'Datum jiz bylo vyplneno drive!'; EXIT; END ELSE BEGIN EXCEPTION chyba 'Osoba jiz ma nastavene datum umrti (' || datum_stare || ')!'; END END BEGIN /* datum_stare je prazdne */ UPDATE osoba SET dat_umrti = :datum WHERE ido = :ido; WHEN ANY DO EXCEPTION chyba 'Nepodarilo se nastavit datum umrti!'; END END !!
+SET TERM ;!!
+
+-- a jeji pouziti:
+EXECUTE PROCEDURE p_osoba_umrti(99); -- info: Osoba neexistuje!
+EXECUTE PROCEDURE p_osoba_umrti(3,'2008-02-06'); -- info: Datum umrti bylo nastaveno uspesne.
+-- EXECUTE PROCEDURE p_osoba_umrti(3); -- vyvola vyjimku s textem: Osoba jiz ma nastavene datum umrti (2008-02-06)!
+-- EXECUTE PROCEDURE p_osoba_umrti(1,'2008-02-30'); -- chyba (datum 30. 2. 2008)
+
+-- pridame nove misto:
+EXECUTE PROCEDURE p_misto_pridej('Dlouhá Jízda',1254,'Děčín',40502);
+-- pridame snatky, abychom mohli (priste) vytvorit pohledy a overit si, co ukazuji:
+INSERT INTO snatek (datum,nevesta_id,zenich_id,nprijmn) VALUES ('1961-04-09',7,3,'Čápová');
+INSERT INTO snatek (datum,nevesta_id,zenich_id,nprijmn,dat_rozvodu) VALUES ('1979-07-19',8,4,'Nová','1990-03-20');
+INSERT INTO snatek (datum,nevesta_id,zenich_id,nprijmn,misto_id) VALUES ('1991-08-16',8,9,'Suková',1);
+INSERT INTO snatek (datum,nevesta_id,zenich_id,nprijmn) VALUES ('2009-09-02',6,5,'Šerá');
+SELECT * FROM snatek ORDER BY datum; -- mame 4 zaznamy

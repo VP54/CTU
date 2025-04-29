@@ -1,0 +1,13 @@
+*.png
+*.jpg
+
+*.parquet
+*.csv
+*.xlsx
+*.xls
+
+*.env
+*.enc
+
+*.zip
+*.pdf

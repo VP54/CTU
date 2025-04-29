@@ -1,0 +1,62 @@
+\documentclass{article}
+\date{20. listopadu 2023}
+\renewcommand{\figurename}{Obr.}
+
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{bigints}
+\usepackage{graphicx}
+\usepackage{mwe}% just for the example content
+\usepackage{tikz}
+\newcommand\dummy{\frac{a}{c}\,\mathrm{d}P}
+\newenvironment{conditions*}
+  {\par\vspace{\abovedisplayskip}\noindent
+   \tabularx{\columnwidth}{>{$}l<{$} @{${}={}$} >{\raggedright\arraybackslash}X}}
+  {\endtabularx\par\vspace{\belowdisplayskip}}
+\SetKwComment{Comment}{/* }{ */}
+
+\begin{document} % {}
+
+
+%\begin{algorithm}
+%\caption{Glauberova dynamika pro Isinguv model}\label{alg:one}
+%\KwData{$\text{pocatecni mrizka M}, T, \text{pocet iteraci iter}$}
+%\KwResult{$\text{Odsimulovane mrizky}$}
+%$\text{simulovane pole} \gets \text{pocet iteraci}$\\
+%\For{$\text{i}=1$ \KwTo $\text{iter}$}{
+%	$\text{x} \gets \text{nahodna souradnice mrizky na ose x}$\\%
+%	$\text{y} \gets \text{nahodna souradnice mrizky na ose y}$\\
+%	$\text{s} \gets \text{M[x, y]}$ \Comment*[r]{Hodnota spinu mrizky se souradnicemi x, y}\\
+%	$\text{P(spin)} \gets e^{\Delta E / T}$ \Comment*[r]{Pravdepodobnost ze spin zmeni hodnotu}%\\
+%    $\text{rand} \gets random.uniform(0, 1)$ \Comment*[r]{Nahodne cislo z Ro(0, 1)}\\
+%    \eIf{\text{P(spin)} $> \text{rand$}{
+%		$\text{M[x, y]} \gets -1 \cdot \text{s}$ \Comment*[r]{Obrat hodnotu spinu}\\
+%	}{
+%            $\text{M[x, y]} \gets \text{s}$
+%  	}
+%  }
+%}
+%\end{algorithm}
+
+
+\begin{tabular}{rllll} \hline   & type   & message                                                      & job       & date       \\\\ \hline  0 & ERROR  & Error in slack msg to: C02QE0576JG \n func: send\_block  notebook: /dev/TS\_Bots/DS\_Bot\_22/main  error: invalid\_blocks                                                              & DS\_Bot\_22 & 2023-11-21 \\\\\n  1 & INFO   & Info o firemni ceste zaslano do channelu: DS-OFFICE-HELPDESK & DS\_Bot\_22 & 2023-11-21 \\\  2 & INFO   & Info o firemni ceste zaslano do channelu: DS-OFFICE-HELPDESK & DS\_Bot\_22 & 2023-11-21 \\\\ 3 & INFO   & No new work trips to report                                  & DS\_Bot\_22 & 2023-11-27 \\\  4 & INFO   & No new work trips to report                                  & DS\_Bot\_22 & 2023-11-27 \\\\ \hline
+\end{tabular}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}  %  {}

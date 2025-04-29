@@ -1,0 +1,77 @@
+-- cd C:\...nekde...\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+CONNECT 'hry.fdb'; -- pripojeni k existujici databazi
+-- nastaveni mensi sirky nekterych sloupcu (pri zobrazeni; prikaz "isql") :
+SET WIDTH jmeno 8;
+SET WIDTH prijmeni 15;
+SET WIDTH nazev 15;
+SET WIDTH nazevhry 15;
+SET WIDTH nazevtypu 15;
+
+SHOW PROCEDURES; -- jake procedury mame z minula?
+-- priklad 9-7:
+SET TERM !!; -- budeme tvorit procedury => "isql" nesmi povazovat strednik za "ukoncovac" prikazu!
+CREATE PROCEDURE p_hra_nova (nazevhry TYPE OF COLUMN hra.nazev, verze TYPE OF COLUMN hra.verze, vydana TYPE OF COLUMN hra.vydana, nazevtypu TYPE OF COLUMN typ.nazev) RETURNS (id INTEGER) AS DECLARE VARIABLE idtypu INTEGER; BEGIN SELECT idhry FROM hra WHERE nazev=:nazevhry AND verze=:verze INTO :id; IF (id IS NOT NULL) THEN EXIT; /* takova hra uz existuje */ EXECUTE PROCEDURE p_typ_novy(:nazevtypu) RETURNING_VALUES :idtypu; id = NEXT VALUE FOR g_hra; BEGIN INSERT INTO hra VALUES 
+-- proc to na cviceni nefungovalo: problem byl s "id" v prikazu SELECT (ne v IFu) => "idhry"
+
+-- priklad 9-8:
+CREATE PROCEDURE p_hrac_novy (jm TYPE OF COLUMN hrac.jmeno, prijm TYPE OF COLUMN hrac.prijmeni, nar TYPE OF COLUMN hrac.datnaroz) RETURNS (id INTEGER) AS BEGIN id = NEXT VALUE FOR g_hrac; BEGIN INSERT INTO hrac VALUES (:id, :jm, :prijm, :nar); WHEN ANY DO EXCEPTION chyba ’Nelze vlozit noveho hrace!’; END END !!
+
+-- priklad 9-9 (zkontrolujeme sice existenci hrace a existenci hry, ale neresime, zda je vyplneno skore => WHEN ANY...;): 
+CREATE PROCEDURE p_skore_nove(hrac TYPE OF COLUMN skore.hrac, hra TYPE OF COLUMN skore.hra, skore TYPE OF COLUMN skore.skore, den DATE = NULL) AS DECLARE pom INTEGER = NULL; BEGIN BEGIN /* blok pro zjisteni existence ID hrace v tab. HRAC */ SELECT COUNT(*) FROM hrac WHERE idhrace=:hrac INTO :pom; IF (pom<1) THEN EXCEPTION chyba 'Hrac s timto ID neexistuje (prvni vstup)!'; END BEGIN /* blok pro zjisteni existence ID hry v tab. HRA */ SELECT COUNT(*) FROM hra WHERE idhry=:hra INTO :pom; IF (pom<1) THEN EXCEPTION chyba 'Hra s timto ID neexistuje (druhy vstup)!'; END /* doplnime den, pokud byl prazdny */ IF (den IS NULL) THEN den = CAST('today' AS DATE); BEGIN pom = NULL; SELECT MAX(poradi) FROM skore WHERE hrac=:hrac AND hra=:hra AND den=:den INTO :pom; IF (pom IS NULL) THEN pom = 1; ELSE pom = pom + 1; BEGIN INSERT INTO skore VALUES(:hrac,:hra,:den,:pom,:skore); WHEN ANY DO EXCEPTION chyba 'Nelze vlozit nove skore!'; END END END!!
+SET TERM ;!!
+
+-- vyzkousime nove procedury:
+EXECUTE PROCEDURE p_hrac_novy('Eda','Synek','2001-04-01'); -- melo by byt vraceno ID=9
+EXECUTE PROCEDURE p_skore_nove(9,3,4003);
+EXECUTE PROCEDURE p_skore_nove(9,3,4190);
+EXECUTE PROCEDURE p_skore_nove(9,3,3992,'2023-11-26');
+SELECT * FROM skore WHERE hrac=9 ORDER BY den,poradi; -- overime si, ze nove pridany hrac 3x neco hral
+-- vyzkousime chybna volani procedury pro nove skore:
+-- EXECUTE PROCEDURE p_skore_nove(9,21,3992,'2023-11-26'); -- chyba: Hra s timto ID neexistuje (druhy vstup)!
+-- EXECUTE PROCEDURE p_skore_nove(90,2,3992,'2023-11-26'); -- chyba: Hrac s timto ID neexistuje (prvni vstup)!
+-- EXECUTE PROCEDURE p_skore_nove(9,2,NULL,'2023-11-26'); -- chyba (obecna, jelikoz neosetrujeme prazdne skore): Nelze vlozit nove skore!
+
+-- SELEKTOVE procedury:
+-- priklad 9-10:
+SET TERM !!;
+CREATE PROCEDURE p_hra_prehled_skore (idhry INTEGER) RETURNS (skore INTEGER, idhrace INTEGER, den DATE, poradi INTEGER) AS DECLARE pom INTEGER = NULL; BEGIN BEGIN SELECT COUNT(*) FROM hra WHERE idhry=:idhry INTO :pom; IF (pom<1) THEN EXCEPTION chyba 'Hra neexistuje!'; END FOR SELECT hrac,den,poradi,skore FROM skore WHERE hra=:idhry ORDER BY skore DESC, hrac INTO :idhrace,:den,:poradi,:skore DO SUSPEND; END !!
+
+-- priklad 9-11:
+CREATE PROCEDURE hrac_prehled_her (idhrace INTEGER) RETURNS (idhry INTEGER, nazevhry VARCHAR(35) CHARACTER SET UTF8, verze VARCHAR(20), indiv_max_skore INTEGER, indiv_avg_skore FLOAT, den1 DATE, denposl DATE, abs_prum_skore FLOAT, abs_max_skore INTEGER) AS BEGIN BEGIN IF (NOT EXISTS(SELECT idhrace FROM hrac WHERE idhrace=:idhrace)) THEN EXCEPTION chyba 'Hrac neexistuje!'; END FOR SELECT idhry, nazev, verze FROM hra ORDER BY nazev,verze INTO :idhry,:nazevhry,:verze DO BEGIN SELECT MAX(skore),AVG(skore*1.0),MIN(den),MAX(den) FROM skore WHERE hra=:idhry AND hrac=:idhrace  INTO :indiv_max_skore,:indiv_avg_skore,:den1,:denposl; /* za hru a toho hrace */ SELECT MAX(skore),AVG(skore) FROM skore WHERE hra=:idhry INTO :abs_prum_skore,:abs_max_skore; SUSPEND; END END!!
+SET TERM ;!! -- strednik ma zase vyznam "ukoncovace"
+
+-- pouziti selektovych procedur:
+SELECT * FROM p_hra_prehled_skore(1); -- OK, byt je vysledek prazdny (hru s ID=1 jeste nikdo nehral)
+-- SELECT * FROM p_hra_prehled_skore(100); -- chyba: Hra neexistuje! K ZAMYSLENI: to, ze hra neexistuje, zbytecne vyvolava vyjimku (dalo se to resit tak, ze procedura proste nic nevrati)
+SELECT * FROM vitezove; -- ktera hra ma aktualne vice vitezu?
+SELECT * FROM p_hra_prehled_skore(2); -- vice vysledku, razeno dle toho, jak to ma procedura ve FOR-cyklu
+SELECT * FROM p_hra_prehled_skore(2) ORDER BY den; -- vice vysledku, razeno jinak (tj. ORDER BY zde probehlo 2x)
+SELECT * FROM p_hra_prehled_skore(3); -- uplne nejvic vysledku :-)
+
+-- ____________________ timto koncime s praci na databazi HRY.FDB ____________________
+
+-- ____________________ a zaciname jinou ulohu: databaze SNATKY.FDB ____________________
+
+CREATE DATABASE 'snatky.fdb'; -- pred vytvorenim nove DB je potreba v "isql" potvrdit transakci ("y")!
+
+-- vytvorime si domeny, ktere nasledne vyuzijeme v tabulkach:
+CREATE DOMAIN identif AS INTEGER NOT NULL CHECK (VALUE>0);
+CREATE DOMAIN cislo_nepov AS INTEGER CHECK (VALUE>0);
+CREATE DOMAIN str20 AS VARCHAR(20) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN str35 AS VARCHAR(35) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN str50 AS VARCHAR(50) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN str35nepov AS VARCHAR(35) CHARACTER SET UTF8 COLLATE UTF8;
+CREATE DOMAIN datum_pov AS DATE NOT NULL;
+CREATE DOMAIN datum_nepov AS DATE;
+CREATE DOMAIN pohlavi AS CHAR(1) CHARACTER SET UTF8 NOT NULL CHECK (VALUE IN ('M','F')) COLLATE UTF8;
+CREATE DOMAIN rodne_cislo AS VARCHAR(10) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN psc AS INTEGER NOT NULL CHECK (VALUE>10000 AND VALUE<99999); 
+
+SHOW DOMAINS; -- prehled domen (prikaz "isql"!)
+
+-- vytvorime tabulky (zbytek priste):
+
+CREATE TABLE misto (id identif, ulice str50, cp identif, mesto str50, psc psc, CONSTRAINT misto_pk PRIMARY KEY (id));
+
+CREATE TABLE osoba (ido identif, jmeno str20, rodne_prijm str35, pohlavi pohlavi, rodne_cislo rodne_cislo, dat_naroz datum_pov, dat_umrti datum_nepov, CONSTRAINT osoba_pk PRIMARY KEY(ido), CONSTRAINT uniq_rc UNIQUE(rodne_cislo));

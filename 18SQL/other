@@ -1,0 +1,23 @@
+,id,skill,hobby,tribe
+0,204400,['SQL and Database Management'],['Support'],Hitchhiking
+1,858286,['Data Ethics and Security'],['Engineering'],Reading
+2,450424,['SQL and Database Management'],['Other'],Hitchhiking
+3,314384,['Data Analysis'],['Other'],Bag packing
+4,162448,['Statistical Analysis'],['Analysis'],Hitchhiking
+5,636435,['Data Cleaning and Preprocessing'],['Analysis'],Reading
+6,429636,['Data Cleaning and Preprocessing'],['Other'],Hitchhiking
+7,533121,['Statistical Analysis'],['Support'],Hitchhiking
+8,263275,['Data Analysis'],['Other'],Reading
+9,921393,['SQL and Database Management'],['Other'],Reading
+10,726689,['Data Visualization'],['Other'],Bag packing
+11,675721,"['Programming Languages (Python, R, etc.)']",['Other'],Reading
+12,197533,"['Big Data Tools (Hadoop, Spark, etc.)']",['Support'],Reading
+13,265841,"['Big Data Tools (Hadoop, Spark, etc.)']",['Analysis'],Hitchhiking
+14,522557,"['Big Data Tools (Hadoop, Spark, etc.)']",['Analysis'],Bag packing
+15,330916,['Data Cleaning and Preprocessing'],['Analysis'],Hitchhiking
+16,702163,['Data Analysis'],['Other'],Reading
+17,124747,"['Programming Languages (Python, R, etc.)']",['Engineering'],Hitchhiking
+18,810042,['Data Cleaning and Preprocessing'],['Analysis'],Reading
+19,797275,['Data Analysis'],['Other'],Hitchhiking
+20,318061,"['Programming Languages (Python, R, etc.)']",['Other'],Reading
+21,979971,['Data Analysis'],['Other'],Reading

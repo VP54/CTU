@@ -1,0 +1,59 @@
+-- Prikazova radek MS Windows (CMD): nastavit adresar, kde je "isql.exe" => napriklad: cd C:\data\Firebird_4
+-- isql -help => moznosti klienta "isql"
+-- isql -u sysdba -p masterkey
+
+CREATE DATABASE 'hry.fdb'; -- vytvoreni nove databaze (lze pridat LOKALNI cestu: CREATE DATABASE 'C:/nekde/neco/hry.fdb';)
+
+-- vytvoreni domen (volitelny krok, ale pak je vyuzijeme):
+
+CREATE DOMAIN identif AS INTEGER NOT NULL CHECK (VALUE>0);
+CREATE DOMAIN str35 AS VARCHAR(35) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN str20 AS VARCHAR(20) CHARACTER SET UTF8 NOT NULL COLLATE UTF8;
+CREATE DOMAIN datum_pov AS DATE NOT NULL;
+
+SHOW DOMAINS; -- prikaz "isql" => zobrazeni domen, ktere jsou v teto databazi k dispozici (mely by byt 4)
+-- SHOW DOMAIN identif; => zobrazeni definice konkretni domeny
+
+
+-- vytvoreni tabulek podle ERA diagramu (PDF, strana c. 12). Tabulky vytvorime rovnou i s cizimi klici (tj. zalezi na poradi vytvareni!):
+
+CREATE TABLE typ (
+	idt identif,
+	nazev str35,
+	CONSTRAINT typ_pk PRIMARY KEY (idt),
+	CONSTRAINT typ_uniq_nazev UNIQUE(nazev)
+);
+
+
+CREATE TABLE hra (
+	idhry identif,
+	nazev str35,
+	verze str20,
+	vydana datum_pov,
+	typ identif,
+	CONSTRAINT hra_pk PRIMARY KEY (idhry),
+	CONSTRAINT hry_uniq_naz_ver UNIQUE (nazev,verze),
+	CONSTRAINT hra_fk_typ FOREIGN KEY (typ) REFERENCES typ (idt) ON UPDATE CASCADE
+);
+
+CREATE TABLE hrac (
+	idhrace identif,
+	jmeno str20,
+	prijmeni str35,
+	datnaroz datum_pov,
+	CONSTRAINT hrac_pk PRIMARY KEY (idhrace)
+);
+
+CREATE TABLE skore (
+	hrac identif,
+	hra identif,
+	den datum_pov,
+	poradi identif,
+	skore identif,
+	CONSTRAINT skore_pk PRIMARY KEY (hrac,hra,den,poradi),
+	CONSTRAINT skore_fk_hrac FOREIGN KEY (hrac) REFERENCES hrac (idhrace) ON UPDATE CASCADE,
+	CONSTRAINT skore_fk_hra FOREIGN KEY (hra) REFERENCES hra (idhry) ON UPDATE CASCADE
+);
+
+SHOW TABLES; -- prikaz "isql" => jake tabulky mame vytvorene? (Mely by byt: HRA, HRAC, SKORE, TYP)
+

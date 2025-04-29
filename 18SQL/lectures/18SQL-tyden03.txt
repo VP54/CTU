@@ -1,0 +1,38 @@
+-- Prikazova radek MS Windows (CMD): nastavit adresar, kde je "isql.exe" => napriklad: cd C:\data\Firebird_2_5
+-- isql -help => moznosti klienta "isql"
+-- isql -u sysdba -p masterkey
+
+CONNECT 'hry.fdb'; -- pripojeni se k databazi, kterou jsme vytvorili minuly tyden (lze pridat LOKALNI cestu: CONNECT 'C:/nekde/neco/hry.fdb';)
+
+-- podivame se, co mame z minula:
+SHOW DOMAINS; -- mely by byt 4 (DATUM_POV, IDENTIF, STR20, STR35)
+SHOW TABLES; -- mely by byt take 4 (HRA, HRAC, SKORE, TYP)
+
+-- vytvorime sekvence (generatory) pro kazdou tabulku-ciselnik:
+CREATE SEQUENCE g_typ;
+CREATE SEQUENCE g_hra;
+CREATE SEQUENCE g_hrac;
+SHOW SEQUENCES; -- prikaz od "isql" (pro vizualni kontrolu)
+HELP; -- prehled dalsich prikazu "isql"
+
+-- vlozime data z textoveho souboru, vyuzijeme sekvence (problem s kodovou strankou cestiny pro CMD v MS Windows):
+INPUT 'data.txt'; -- vlozeni dat (soubor "data.txt" musi byt ve stejnem adresari jako "isql.exe", jinak je potreba uvest i cestu!)
+
+-- overeni, jaka data mame v tabulce TYP:
+SELECT * FROM typ;
+SET NAMES UTF8; -- pokus o nastaveni znakove sady (prikaz "isql"!). Pokud nefunguje, musime to udelat pri spusteni "isql" (ukazu priste)
+
+-- ukazky CHYBNYCH prikazu pro vlozeni dat (vsimnete si popisu chyby -> mam pojmenovana omezeni v CREATE TABLE):
+
+INSERT INTO skore VALUES (1,30,'2023-10-09',1,2439); -- Statement failed, SQLSTATE = 23000 | violation of FOREIGN KEY constraint "SKORE_FK_HRA" on table "SKORE" | -Foreign key reference target does not exist
+
+INSERT INTO skore VALUES (40,1,'2023-10-09',1,2439); -- Statement failed, SQLSTATE = 23000 | violation of FOREIGN KEY constraint "SKORE_FK_HRAC" on table "SKORE" | -Foreign key reference target does not exist
+
+INSERT INTO skore VALUES (1,1,'2023-02-30',1,2439); -- Statement failed, SQLSTATE = 22018 | conversion error from string "2023-02-30"
+
+
+-- dotazy:
+
+SELECT * FROM typ ORDER BY nazev;
+SELECT * FROM hra ORDER BY nazev, verze;
+SELECT * FROM hra WHERE nazev LIKE 'P%' ORDER BY nazev, verze;

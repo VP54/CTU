@@ -1,0 +1,2 @@
+logs: 
+timestamp: 1700664859.445143 simulation: 9801 		 prob_spin: 0.018 	 False 	 x: 4 	 y: 8

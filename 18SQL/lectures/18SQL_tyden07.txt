@@ -1,0 +1,79 @@
+-- cd C:\...nekde...\_Firebird2.5_
+-- isql -u sysdba -p masterkey -ch DOS852
+-- nastaveni mensi sirky nekterych sloupcu (pri zobrazeni; prikaz "isql") 
+SET WIDTH jmeno 8;
+SET WIDTH prijmeni 15;
+SET WIDTH nazev 15;
+CONNECT 'hry.fdb';
+
+-- priklady 7:
+-- priklad 7-1:
+SELECT idhrace,jmeno,prijmeni FROM hrac WHERE idhrace IN (SELECT hrac FROM skore WHERE den=(SELECT MAX(den) FROM skore)) ORDER BY prijmeni,jmeno; -- bohuzel zde nevypisujeme den!
+SELECT idhrace,jmeno,prijmeni,den AS den_posledni FROM hrac JOIN skore ON idhrace=hrac WHERE den=(SELECT MAX(den) FROM skore) ORDER BY prijmeni,jmeno; -- vypisujeme i den (logika dotazu se vsak zmenila)
+SELECT DISTINCT idhrace,jmeno,prijmeni,den AS den_posledni FROM hrac JOIN skore ON idhrace=hrac WHERE den=(SELECT MAX(den) FROM skore) ORDER BY prijmeni,jmeno; -- vylepseni: vypis bez duplicit
+-- pridame nova data:
+INSERT INTO skore VALUES (6,3,CAST('today' AS DATE),1,3859);
+INSERT INTO skore VALUES (6,2,CAST('today' AS DATE),1,7100);
+SELECT DISTINCT idhrace,jmeno,prijmeni,den AS den_posledni FROM hrac JOIN skore ON idhrace=hrac WHERE den=(SELECT MAX(den) FROM skore) ORDER BY prijmeni,jmeno; -- zmena vysledku podle nove vlozenych zaznamu
+-- jeste pridame dalsi zaznam:
+INSERT INTO skore VALUES (3,2,CAST('today' AS DATE),1,7311);
+SELECT DISTINCT idhrace,jmeno,prijmeni,den AS den_posledni FROM hrac JOIN skore ON idhrace=hrac WHERE den=(SELECT MAX(den) FROM skore) ORDER BY prijmeni,jmeno; -- zmena dle nove vlozenych zaznamu
+
+-- priklad 7-2:
+SELECT DISTINCT idhry,nazev,verze,den AS den_posledni FROM hra JOIN skore ON idhry=hra WHERE den=(SELECT MAX(den) FROM skore) ORDER BY nazev,verze; --obdoba 7-1
+
+-- priklad 7-3:
+SELECT idhrace, jmeno, prijmeni FROM hrac WHERE datnaroz = (SELECT MAX(datnaroz) FROM hrac) ORDER BY prijmeni, jmeno;
+
+-- priklad 7-4:
+SELECT idhrace,jmeno,prijmeni FROM hrac JOIN skore ON idhrace=hrac WHERE skore >= (SELECT AVG(skore) FROM skore WHERE hra=3) AND hra=3 ORDER BY skore DESC; -- chybi den a hodnota skore!
+SELECT idhrace,jmeno,prijmeni,den,skore FROM hrac JOIN skore ON idhrace=hrac WHERE skore >= (SELECT AVG(skore) FROM skore WHERE hra=3) AND hra=3 ORDER BY skore DESC; -- zamyslete se: mohou byt ve vysledku duplicity? (Obecne vzato, nikoli jen pro soucasna data.)
+
+-- priklad 7-5:
+SELECT idhrace,jmeno,prijmeni,den,skore FROM hrac JOIN skore ON idhrace=hrac WHERE skore = (SELECT MAX(skore) FROM skore WHERE hra=3) AND hra=3 ORDER BY skore DESC; -- obdoba prikladu 7-4 (ale neni vypsano prumerne skore!)
+-- vlozime dalsi zaznam:
+INSERT INTO skore VALUES (6,3,'2023-11-06',2,4150);
+SELECT idhrace,jmeno,prijmeni,den,skore,(SELECT AVG(skore) FROM skore WHERE hra=3) AS prumerne_skore FROM hrac JOIN skore ON idhrace=hrac WHERE skore = (SELECT MAX(skore) FROM skore WHERE hra=3) AND hra=3 ORDER BY prijmeni,jmeno; -- priklad 7-5 (s vypisem prumerneho skore za hru + opraveno razeni)
+
+-- priklad 7-6:
+SELECT idhrace,jmeno,prijmeni,den,skore,(SELECT AVG(skore) FROM skore WHERE hra=3 AND hrac=idhrace) AS prumerne_skore_hrace FROM hrac JOIN skore ON idhrace=hrac WHERE skore = (SELECT MAX(skore) FROM skore WHERE hra=3) AND hra=3 ORDER BY prijmeni,jmeno; -- uprava prikladu 7-5 na priklad 7-6
+
+-- UNION - ukazka:
+SELECT hrac.*, 'nehrajici' AS stav FROM hrac WHERE idhrace NOT IN (SELECT hrac FROM skore) UNION SELECT hrac.*, 'hrajici' FROM hrac WHERE idhrace IN (SELECT hrac FROM skore); -- vypis hracu, u kazdeho je text: hrajici || nehrajici
+SELECT hrac.*, 'nehrajici' AS stav FROM hrac WHERE idhrace NOT IN (SELECT hrac FROM skore) UNION SELECT hrac.*, 'hrajici' FROM hrac WHERE idhrace IN (SELECT hrac FROM skore) ORDER BY 3,2; -- totez, doplnene o razeni vysledku dle prijmeni a jmena (ve Firebirdu nutno pouzit PORADI sloupcu, nikoli nazvy!)
+-- jiny zpusob vypisu hracu s textem "(ne)hrajici" (nepouzijeme UNION):
+SELECT DISTINCT hrac.*, CASE hra WHEN NULL THEN 'nehrajici' ELSE 'hrajici' END AS stav FROM hrac LEFT JOIN skore ON idhrace=hrac ORDER BY prijmeni,jmeno; -- chybne CASE (NULL neni validni hodnota => vzdy vyhraje ELSE)
+SELECT DISTINCT hrac.*, CASE WHEN hra IS NULL THEN 'nehrajici' ELSE 'hrajici' END AS stav FROM hrac LEFT JOIN skore ON idhrace=hrac ORDER BY prijmeni,jmeno; -- spravny dotaz
+
+-- vytvareni pohledu:
+-- priklad 8-1:
+SELECT hrac.*,idhry,hra.nazev,verze,vydana,typ.*,den,poradi,skore FROM hrac JOIN skore ON idhrace=hrac JOIN hra ON idhry=hra JOIN typ ON idt=typ;
+SQL> SELECT * FROM skore_vse WHERE idhry=4 ORDER BY skore DESC; -- nejprve overime: je dotaz pro budouci pohled spravny?
+CREATE VIEW skore_vse (idhrace,jmeno,prijmeni,datnaroz,idhry,nazevhry,verze,vydana,idt,nazevtypu,den,poradi,skore) AS SELECT hrac.*,idhry,hra.nazev,verze,vydana,typ.*,den,poradi,skore FROM hrac JOIN skore ON idhrace=hrac JOIN hra ON idhry=hra JOIN typ ON idt=typ; -- pohled SKORE_VSE
+SELECT * FROM skore_vse WHERE idhry=4 ORDER BY skore DESC; -- pouziti pohledu
+SELECT COUNT(*) FROM skore_vse; -- porovnani poctu radku pohledu SKORE_VSE...
+SELECT COUNT(*) FROM skore; -- ..s pocetem radku tabulky SKORE (musi se rovnat, jelikoz poled pouze pridava dalsi sloupce k tabulce SKORE)
+
+-- priklad 8-2:
+SELECT hra.*, (SELECT COUNT(skore) FROM skore WHERE hra=idhry) FROM hra; -- overime, ze dotaz funguje...
+CREATE VIEW hra_pocet_hrani (idhry,nazev,verze,vydana,typ,pocet_hrani) AS SELECT hra.*, (SELECT COUNT(skore) FROM skore WHERE hra=idhry) FROM hra; -- ...a vytvorime pohled
+DROP VIEW hra_pocet_hrani; -- v nazvu pohledu byl preklep (kdyby pohled neslo odstranit z duvodu "view is in use", tak je potreba zadat: COMMIT;)
+CREATE VIEW hry_pocet_hrani (idhry,nazev,verze,vydana,typ,pocet_hrani) AS SELECT hra.*, (SELECT COUNT(skore) FROM skore WHERE hra=idhry) FROM hra; -- pohled se spravnym nazvem
+SELECT * FROM hry_pocet_hrani ORDER BY nazev,verze; -- pouziti pohledu
+SELECT * FROM hry_pocet_hrani ORDER BY pocet_hrani DESC,nazev,verze; -- jine razeni
+SET STATS; -- zapneme vypis statistik (prikaz "isql"!) => chceme prozkoumat, co je efektivnejsi
+SELECT hra.*, (SELECT COUNT(skore) FROM skore WHERE hra=idhry) FROM hra; -- pustime prvni dotaz, vsimneme si casu atp.
+SELECT hra.*, (SELECT COUNT(skore) FROM skore WHERE hra=idhry) FROM hra; -- pustime prvni dotaz znovu -> cas se zkrati
+SELECT hra.*, COUNT(skore) FROM hra LEFT JOIN skore ON idhry=hra GROUP BY idhry,nazev,verze,vydana,typ; -- pustime druhy dotaz. Vypada to, ze casove (pri tak malem poctu dat) jsou stejne
+SELECT hra.*, COUNT(skore) FROM hra LEFT JOIN skore ON idhry=hra GROUP BY idhry,nazev,verze,vydana,typ; -- jeste jednou druhy dotaz -> cas se zkrati
+SET STATS; -- vypneme vypis statistik
+
+-- priklad 8-3:
+CREATE VIEW hraci_pocet_ruznych_her (idhrace,jmeno,prijmeni,datnaroz,pocet_ruznych_her) AS SELECT hrac.*, (SELECT DISTINCT hra FROM skore WHERE hrac=idhrace) FROM hrac LEFT JOIN skore ON idhrace=hrac GROUP BY idhrace,jmeno,prijmeni,datnaroz;
+SELECT * FROM hraci_pocet_ruznych_her ORDER BY 5 DESC; -- pouziti pohledu ohlasi chybu "multiple rows in singleton select"
+COMMIT; -- potrvdime transakci, aby pohled nebyl "in use" a slo jej zmenit
+RECREATE VIEW hraci_pocet_ruznych_her (idhrace,jmeno,prijmeni,datnaroz,pocet_ruznych_her) AS SELECT hrac.*, (SELECT COUNT(DISTINCT hra) FROM skore WHERE hrac=idhrace) FROM hrac LEFT JOIN skore ON idhrace=hrac GROUP BY idhrace,jmeno,prijmeni,datnaroz; -- opraveny pohled, kde je opravdu pocet her (nikoli vypis vsech ID her, ktere hrac hral)
+SELECT * FROM hraci_pocet_ruznych_her ORDER BY 5 DESC; -- pouziti pohledu
+
+
+-- priklad 8-4 a dalsi: priste
